@@ -233,24 +233,22 @@ def login():
 
 
                     
-
 @app.route("/api/place", methods=["GET","POST","PATCH","DELETE"])
 def place():
-    if request.method =="GET":
-        place_id = request.args.get("placeId")
+    if request.method == "GET":
+        user_id = request.args.get("userId")
         conn = None
         cursor = None 
-        place_data = None
+        place_data = None 
         try:
             conn = mariadb .connect(user=dbcreds.user, password=dbcreds.password, host= dbcreds.host, port= dbcreds.port, database= dbcreds.database)
             cursor = conn.cursor()
             if user_id:
                 cursor.execute("SELECT * FROM users u INNER JOIN place p ON u.id = p.user_id WHERE u.id = ?", [user_id])
-                tweet_data = cursor.fetchall()
+                t_data = cursor.fetchall()
             else:
-                #if you want all places
                 cursor.execute("SELECT * FROM users u INNER JOIN place p ON u.id = p.user_id")
-                tweet_data = cursor.fetchall()
+                place_data = cursor.fetchall()
         except Exception as e:
             print(e)
         finally:
@@ -259,19 +257,129 @@ def place():
             if(conn != None):
                 conn.rollback()
                 conn.close()
-                #if there is tweet data or if it is empty
         if place_data or place_data ==[]:
             place_info =[]
             #create for loop
-            for tweet in tweet_data:
-                tweet_dic={
-                    "tweetId": tweet[6],
-                    "userId": tweet [0],
-                    "username": tweet[5],
-                    "content": tweet [8],
-                    "createdAt": tweet [9]
+            for place in place_data:
+                place_dic={
+                    "placeId": place[4],
+                    "userId": place [0],
+                    "name": place [5],
+                    "accomodates": place[6],
+                    "bathrooms": place [7],
+                    "bedrooms": place [8],
+                    "beds": place [9],
+                    "images": place [10],
+                    "price": place [13],
+                    "propertyType": place [14],
+                    "roomType": place[15]
                 }
-                tweet_info.append(tweet_dic)
-            return Response(json.dumps(tweet_info, default = str), mimetype="application/json", status=200)
+                place_info.append(place_dic)
+            return Response(json.dumps(place_info, default = str), mimetype="application/json", status=200)
         else:
             return Response("failure", mimetype="html/text", status=400)
+    if request.method == "POST":
+        login_token = request.json.get("loginToken")
+        name = request.json.get("name")
+        conn = None
+        cursor = None 
+        place = None 
+        user_id = None
+        place_id = None
+        try:
+            conn = mariadb .connect(user=dbcreds.user, password=dbcreds.password, host= dbcreds.host, port= dbcreds.port, database= dbcreds.database)
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM user_session WHERE loginToken = ?", [login_token])
+            user_id = cursor.fetchone()[0]
+            cursor.execute("INSERT INTO place(user_id, name) VALUES (?,?)", [user_id, name])
+            conn.commit() 
+            place_id = cursor.lastrowid
+            cursor.execute("SELECT * FROM users u INNER JOIN place p ON u.id = p.user_id where p.id = ?", [place_id])
+            place = cursor.fetchone()
+        except Exception as e:
+            print(e)
+        finally:
+            if(cursor !=None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if place or place ==[]:
+                place_dic={
+                    "placeId": place[4],
+                    "userId": place [0],
+                    "name": place [5],
+                    "accomodates": place[6],
+                    "bathrooms": place [7],
+                    "bedrooms": place [8],
+                    "beds": place [9],
+                    "images": place [10],
+                    "price": place [13],
+                    "propertyType": place [14],
+                    "roomType": place[15]
+                }
+                return Response(json.dumps(place_dic, default = str), mimetype="application/json", status=201)
+            else:
+                return Response("failure", mimetype="html/text", status=400)
+    if request.method == "PATCH":
+        login_token = request.json.get("loginToken")
+        place_id = request.json.get("placeId")
+        name = request.json.get("name")
+        conn = None
+        cursor = None 
+        user_id = None
+        rows= None
+        try:
+            conn = mariadb .connect(user=dbcreds.user, password=dbcreds.password, host= dbcreds.host, port= dbcreds.port, database= dbcreds.database)
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM user_session WHERE loginToken = ?", [login_token])
+            user_id = cursor.fetchone()[0]
+            cursor.execute("UPDATE place SET name = ? WHERE id=? AND user_id =?", [name, place_id, user_id])
+            conn.commit() 
+            rows = cursor.rowcount
+        except Exception as e:
+            print(e)
+        finally:
+            if(cursor !=None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if rows != None:
+                response_dic={
+                    "placeId": place_id,
+                    "name": name,
+                }
+                return Response(json.dumps(response_dic, default = str), mimetype="application/json", status=200)
+            else:
+                return Response("failure", mimetype="html/text", status=400)
+    if request.method == "DELETE":
+        login_token = request.json.get("loginToken")
+        place_id = request.json.get("placeId")
+        conn = None
+        cursor = None 
+        user_id = None
+        rows= None
+        try:
+            conn = mariadb .connect(user=dbcreds.user, password=dbcreds.password, host= dbcreds.host, port= dbcreds.port, database= dbcreds.database)
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM user_session WHERE loginToken = ?", [login_token])
+            user_id = cursor.fetchone()[0]
+            cursor.execute("DELETE FROM place WHERE id=? AND user_id =?", [place_id, user_id])
+            conn.commit() 
+            rows = cursor.rowcount
+        except Exception as e:
+            print(e)
+        finally:
+            if(cursor !=None):
+                cursor.close()
+            if(conn != None):
+                conn.rollback()
+                conn.close()
+            if rows != None:
+                return Response("Delete success", mimetype="html/text", status=204)
+            else:
+                return Response("failure", mimetype="html/text", status=400)
+    
+
+                
